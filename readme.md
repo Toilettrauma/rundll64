@@ -12,7 +12,7 @@ Example:
 > rundll64 @kernel32.dll #GetStdHandle -11 #WriteConsoleA % testing 5 0 0
 GetStdHandle -> 0x48
 testingWriteConsoleA -> 0x1
-> rundll64 @rundll64 @kernel32.dll #CreateConsoleScreenBuffer 0xC0000000 0 0 0 0 #SetConsoleActiveScreenBuffer %
+> rundll64 @kernel32.dll #CreateConsoleScreenBuffer 0xC0000000 0 0 0 0 #SetConsoleActiveScreenBuffer %
 CreateConsoleScreenBuffer -> 0x94
 
 ```
