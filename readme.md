@@ -1,4 +1,4 @@
-This tool can run dll methods through cmd arguments. This tool uses WINAPI
+This tool can run dll methods through command line. This tool uses WINAPI
 
 Syntax:
 ```

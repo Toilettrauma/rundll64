@@ -118,13 +118,12 @@ int main(int argc, char* argv[])
     list<libMethodsPair>* orderedLibs = orderLibs(argc, argv);
 
 
-
+    bool isFirst = true;
     for (list<libMethodsPair>::iterator libIter = orderedLibs->begin(); libIter != orderedLibs->end(); libIter++) {
         HMODULE lib = LoadLibraryA(libIter->first);
         if (lib == nullptr) {
             throw LibNotFoundException(libIter->first);
         }
-        bool isFirst = true;
         void* out = nullptr;
         for (list<methodPair>::iterator methodIter = libIter->second.begin(); methodIter != libIter->second.end(); methodIter++) {
             FARPROC method = GetProcAddress(lib, methodIter->first);

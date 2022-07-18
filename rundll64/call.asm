@@ -13,12 +13,9 @@ callF PROC ; rcx = function pointer, rdx = argc, r8 = argv
     sub rsp, 20h
 ; --------------- FUNCTION PREPARE
 
-    mov r10, rdx ; r10 = argc
-    mov r11, r8 ; r11 = argv
-
     mov qword ptr [rbp], rcx ; save function pointer
-    mov qword ptr [rbp+08h], r10 ; save argc
-    mov qword ptr [rbp+10h], r11 ; save argv
+    mov qword ptr [rbp+08h], rdx ; save argc
+    mov qword ptr [rbp+10h], r8 ; save argv
 
     mov qword ptr [rbp+18h], r10 ; iterator argc
     mov qword ptr [rbp+20h], r11 ; iterator argv
