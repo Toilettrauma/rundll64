@@ -1,10 +1,11 @@
-This tool can run dll methods through cmd arguments
-This tool uses WINAPI
+This tool can run dll methods through cmd arguments. This tool uses WINAPI
+
 Syntax:
 ```
 rundll64 @<dllname> #<methodname> <args>... [[@<dllname> ]#<methodname> <args>...]... 
 ```
 arg can be '%' to pass previous method return value
+
 arg can be represented as hex value by entering "0x" before hex value
 
 Example:
