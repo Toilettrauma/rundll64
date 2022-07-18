@@ -17,8 +17,8 @@ callF PROC ; rcx = function pointer, rdx = argc, r8 = argv
     mov qword ptr [rbp+08h], rdx ; save argc
     mov qword ptr [rbp+10h], r8 ; save argv
 
-    mov qword ptr [rbp+18h], r10 ; iterator argc
-    mov qword ptr [rbp+20h], r11 ; iterator argv
+    mov qword ptr [rbp+18h], rdx ; iterator argc
+    mov qword ptr [rbp+20h], r8 ; iterator argv
 ToNumLoop:
     cmp qword ptr [rbp+18h], 0
     jz ToNumLoopEnd
