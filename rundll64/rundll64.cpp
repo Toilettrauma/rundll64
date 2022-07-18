@@ -2,71 +2,152 @@
 //
 
 #include <iostream>
+#define VC_EXTRALEAN
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <shellapi.h>
+#include <exception>
 
-#include <tuple>
+#include <list>
+using namespace std;
 
-enum CallingConvention {
-    //CDECL, unsupported
-    //CLRCALL, unsupported
-    STDCALL,
-    FASTCALL,
-    //THISCALL, unsupported
-    //VECTORCALL unsupported
+//enum CallingConvention {
+//    //CDECL, unsupported
+//    //CLRCALL, unsupported
+//    STDCALL,
+//    FASTCALL,
+//    //THISCALL, unsupported
+//    //VECTORCALL unsupported
+//};
+
+struct LibNotFoundException : std::exception {
+    LibNotFoundException(const char* const libName) : std::exception(libName) {}
 };
-#define QWORDPTR *(long long*)
-#define DWORDPTR *(int*)
-#define BYTEPTR *(char*)
+struct MethodNotFoundException : std::exception {
+    MethodNotFoundException(const char* const methodName) : std::exception(methodName) {}
+};
+
+struct AccessViolationException : std::exception {
+    AccessViolationException() : std::exception("Access violation") {}
+};
 
 void handler(unsigned int u, PEXCEPTION_POINTERS pExceptionInfo) {
-    throw std::exception("Exception");
+    if (u == EXCEPTION_ACCESS_VIOLATION) {
+        throw AccessViolationException();
+    }
+    else {
+        throw std::exception("SEH exception");
+    }
+}
+
+typedef pair<int, char**> argsPair;
+
+typedef pair<char*, argsPair> methodPair;
+typedef pair<char*, list<methodPair>> libMethodsPair;
+
+int getArgsCount(int argc, char** argv) {
+    char** argvIter = argv;
+    int argcIter = 0;
+    for (;argcIter != argc && **argvIter != '#' && **argvIter != '@'; argvIter++, argcIter++) {}
+    return argcIter;
+}
+
+list<methodPair>* orderMethods(char* method, int argc, char** argv) {
+    list<methodPair>* orderedMethods = new list<methodPair>;
+    char** argvIter = argv;
+    int argcIter = 1;
+    for (; argcIter <= argc && **argvIter != '@'; argvIter++, argcIter++) {
+        if (**argvIter == '#') {
+            (*argvIter)++;
+            int argCount = getArgsCount(argc - argcIter, argvIter + 1);
+            argcIter += argCount;
+            argsPair args = make_pair(argCount, argvIter + 1);
+            orderedMethods->push_back(make_pair(*argvIter, args));
+        }
+    }
+    return orderedMethods;
+}
+
+list<libMethodsPair>* orderLibs(int argc, char** argv) {
+    list<libMethodsPair>* orderedLibs = new list<libMethodsPair>;
+    char** argvIter = argv;
+    int argcIter = 1;
+    for (; argcIter <= argc; argvIter++, argcIter++) {
+        if (**argvIter == '@') {
+            (*argvIter)++;
+            list<methodPair>* orderedMethods = orderMethods(*argvIter, argc - argcIter, argvIter + 1);
+            orderedLibs->push_back(make_pair(*argvIter, *orderedMethods));
+        }
+    }
+    return orderedLibs;
+}
+
+int applyArgs(char** string, int size, long long callOut) {
+    for (int i = 0; i < size; i++) {
+        if (*string[i] == '%') {
+            char* formatString = new char[16];
+            int out = snprintf(formatString, 16, "%lld", callOut);
+            string[i] = formatString;
+            return out;
+        }
+    }
+    return -1;
 }
 
 extern "C" void* __fastcall callF(void* functionP, long long argc, char* argv[]);
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    if (argc < 3) {
-        return -1;
-    }
-    
-    int functionCallConvention;
-    if (strcmp(argv[1], "__fastcall") == 0) {
-        argc--;
-        argv++;
-        functionCallConvention = CallingConvention::FASTCALL;
-    }
-    else if (strcmp(argv[1], "__stdcall") == 0) {
-        argc--;
-        argv++;
-        functionCallConvention = CallingConvention::STDCALL;
-    }
-    else {
-        functionCallConvention = CallingConvention::STDCALL;
-    }
-
-    HMODULE moduleLib = LoadLibraryA(argv[1]);
-    if (moduleLib == nullptr) {
-        return -1;
-    }
-    FARPROC moduleProc = GetProcAddress(moduleLib, argv[2]);
-    if (moduleProc == nullptr) {
-        return -1;
-    }
-
-
-    void* out = callF(moduleProc, argc - 3, argv + 3);
     _set_se_translator(handler);
-    try {
-        int y = 0;
-        int a = 1 / y;
-        printf("%ll", QWORDPTR out);
+
+    //int functionCallConvention;
+    //if (strcmp(argv[1], "__fastcall") == 0) {
+    //    argc--;
+    //    argv++;
+    //    functionCallConvention = CallingConvention::FASTCALL;
+    //}
+    //else if (strcmp(argv[1], "__stdcall") == 0) {
+    //    argc--;
+    //    argv++;
+    //    functionCallConvention = CallingConvention::STDCALL;
+    //}
+    //else {
+    //    functionCallConvention = CallingConvention::STDCALL;
+    //}
+
+    list<libMethodsPair>* orderedLibs = orderLibs(argc, argv);
+
+
+
+    for (list<libMethodsPair>::iterator libIter = orderedLibs->begin(); libIter != orderedLibs->end(); libIter++) {
+        HMODULE lib = LoadLibraryA(libIter->first);
+        if (lib == nullptr) {
+            throw LibNotFoundException(libIter->first);
+        }
+        bool isFirst = true;
+        void* out = nullptr;
+        for (list<methodPair>::iterator methodIter = libIter->second.begin(); methodIter != libIter->second.end(); methodIter++) {
+            FARPROC method = GetProcAddress(lib, methodIter->first);
+            if (method == nullptr) {
+                throw MethodNotFoundException(methodIter->first);
+            }
+            if (!isFirst) {
+                applyArgs(methodIter->second.second, methodIter->second.first, (long long)out);
+            }
+            out = callF(method, methodIter->second.first, methodIter->second.second);
+            try {
+                printf("%s -> %lld\n", methodIter->first, *(long long*)out);
+            }
+            catch (AccessViolationException) {
+                printf("%s -> 0x%llX\n", methodIter->first, out);
+            }
+            isFirst = false;
+        }
     }
-    catch (std::exception e) {
-        printf("Exception");
-        return -1;
-    }
-    
+
+
+    return 0;
+
 }
 
 // Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
