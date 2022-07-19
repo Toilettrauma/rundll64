@@ -10,6 +10,6 @@ arg can be represented as hex value by entering "0x" before hex value
 
 Example:
 ```
-> rundll64 @kernel32.dll #GetStdHandle -11 #WriteConsoleA % testing 5 0 0
+> rundll64 @kernel32.dll #GetStdHandle -11 #WriteConsoleA %0 testing 5 0 0
 testing
 ```
