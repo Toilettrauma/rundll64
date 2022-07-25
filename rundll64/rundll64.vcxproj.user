@@ -9,11 +9,11 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>@kernel32.dll #GetStdHandleC -11 #WriteConsoleA %0 hello 5 0 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>@kernel32.dll #GetStdHandle -11 #WriteConsoleA %1 hello 5 0 0 #WriteConsoleA %0 "\n" 1 0 0</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>@kernel32.dll #GetStdHandleC -11 #WriteConsoleA %0 hello 5 0 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>@kernel32.dll #GetStdHandle -11 #WriteConsoleA %1 hello 5 0 0 #WriteConsoleA %0 "\n" 1 0 0</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

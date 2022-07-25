@@ -5,10 +5,10 @@
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <shellapi.h>
+
+#include <array>
 #include <exception>
 
-#include <list>
 #include <vector>
 using namespace std;
 
@@ -41,6 +41,8 @@ void handler(unsigned int u, PEXCEPTION_POINTERS pExceptionInfo) {
     }
 }
 
+typedef void*(*anyFunction)(...);
+
 extern "C" void* __fastcall callF(void* functionP, long long argc, char* argv[]);
 
 vector<void*>* invokeLibMethods(int argc, char* argv[]) {
@@ -49,6 +51,7 @@ vector<void*>* invokeLibMethods(int argc, char* argv[]) {
     char** methodArgsStart = nullptr;
     int argCount = 0;
     vector<void*> *outs = new vector<void*>;
+
     for (int i = 0; i < argc; i++) {
         char* arg = argv[i];
         switch (*arg) {
@@ -80,7 +83,7 @@ vector<void*>* invokeLibMethods(int argc, char* argv[]) {
         case '%':
         {
             char* formattedArg = new char[16];
-            long long outToFormat = (long long)(*outs)[strtol(arg + 1, nullptr, 10)];
+            long long outToFormat = (long long)outs->at(strtol(arg + 1, nullptr, 10));
             snprintf(formattedArg, 16, "%lld", outToFormat);
             argv[i] = formattedArg;
         }
@@ -101,6 +104,7 @@ vector<void*>* invokeLibMethods(int argc, char* argv[]) {
 int main(int argc, char* argv[])
 {
     _set_se_translator(handler);
+    printf(">>> ");
 
     try {
         vector<void*>* outs = invokeLibMethods(argc, argv);

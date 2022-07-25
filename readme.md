@@ -1,5 +1,7 @@
+# rundll64
+## Features
 This tool can run dll methods through command line. This tool uses WINAPI
-
+## Using
 Syntax:
 ```
 rundll64 @<dllname> #<methodname> <args>... [[@<dllname> ]#<methodname> <args>...]... 
