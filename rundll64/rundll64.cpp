@@ -6,7 +6,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include <array>
 #include <exception>
 
 #include <vector>
@@ -40,8 +39,6 @@ void handler(unsigned int u, PEXCEPTION_POINTERS pExceptionInfo) {
         throw std::exception("SEH exception");
     }
 }
-
-typedef void*(*anyFunction)(...);
 
 extern "C" void* __fastcall callF(void* functionP, long long argc, char* argv[]);
 
@@ -104,7 +101,6 @@ vector<void*>* invokeLibMethods(int argc, char* argv[]) {
 int main(int argc, char* argv[])
 {
     _set_se_translator(handler);
-    printf(">>> ");
 
     try {
         vector<void*>* outs = invokeLibMethods(argc, argv);
