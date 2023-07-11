@@ -1,102 +1,81 @@
-EXTERN __imp_strtoll :PROC
-.code
+EXTERN __imp_memcpy :PROC
+.CODE
 
-callF PROC ; rcx = function pointer, rdx = argc, r8 = argv
-; --------------- FUNCTION PREPARE
+; import memcpy
+;
+
+applyF PROC
+; rcx function, rdx argv, r8 argc
+    cmp r8, 4
+    ja _applyFStackArgs
+    mov rax, rcx
+    mov rcx, rdx ; maybe remove
+    mov r8, qword ptr [r8 * 8 + OFFSET arg_jumps]
+    jmp r8
+
+args_0::
+    jmp rax
+
+args_1::
+    mov rcx, qword ptr [rcx]
+    jmp rax
+
+args_2::
+    mov rdx, qword ptr [rcx + 8h]
+    mov rcx, qword ptr [rcx]
+    jmp rax
+
+args_3::
+    mov r8, qword ptr [rcx + 10h]
+    mov rdx, qword ptr [rcx + 8h]
+    mov rcx, qword ptr [rcx]
+    jmp rax
+
+args_4::
+    mov r9, qword ptr [rcx + 18h]
+    mov r8, qword ptr [rcx + 10h]
+    mov rdx, qword ptr [rcx + 8h]
+    mov rcx, qword ptr [rcx]
+    jmp rax
+applyF ENDP
+
+_applyFStackArgs PROC
+; rax function, rdx argv_last, r8 argc
     push rbp ; save rbp
-    ;push r9 ; save r9
-    ;push r10 ; save r10
-    ;push r11 ; save r11
+    mov rbp, rsp
+    sub rsp, 18h ; shadow space (3 variable)
     
-    sub rsp, 30h ; shadow space
-    mov rbp, rsp ; move stack frame to base address
-    sub rsp, 20h
-; --------------- FUNCTION PREPARE
+    mov [rbp-8h], rcx    ; 1st var = function
+    mov [rbp-10h], rdx ; 2nd var = argv
+    lea r8, [r8*8-20h]    ; size: (argc - 4) * 8
+    add rdx, 20h          ; src: (longlong)argv + 4
+    lea rcx, [rsp-8h]    
+    sub rcx, r8           ; dest: rsp - size - 8(reserve ret addr)
+    call qword ptr [__imp_memcpy]
 
-    mov qword ptr [rbp], rcx ; save function pointer
-    mov qword ptr [rbp+08h], rdx ; save argc
-    mov qword ptr [rbp+10h], r8 ; save argv
+    lea rsp, [rax-20h] ; rsp = dest - (4*8)
+    mov rcx, [rbp-10h]  ; retain argv (2nd var)
 
-    mov qword ptr [rbp+18h], rdx ; iterator argc
-    mov qword ptr [rbp+20h], r8 ; iterator argv
-ToNumLoop:
-    cmp qword ptr [rbp+18h], 0
-    jz ToNumLoopEnd
-    mov r11, qword ptr [rbp+20h]
-    mov rcx, qword ptr [r11] ; first arg
-    mov qword ptr [rbp+28h], 0 ; second arg to nullptr
-    lea rdx, [rbp+28h] ; second arg
-    
-    cmp word ptr [rcx], 7830h ; check for "0x" at start
-    je HexCheckTrue
-    cmp word ptr [rcx], 5830h ; check for "0X" at start
-    je HexCheckTrue
-    mov r8, 0Ah ; radix 10
-    jmp HexCheckEnd
-HexCheckTrue:
-    mov r8, 10h ; radix 16
-HexCheckEnd:
-    call qword ptr [__imp_strtoll] ; strtoll( 
-    mov rcx, qword ptr [rbp+28h]
-    cmp byte ptr [rcx], 0
-    jnz NotNum
-    mov qword ptr [r11], rax
-NotNum:
-    dec qword ptr [rbp+18h] ; decrement argc
-    add qword ptr [rbp+20h], 08h ; increment argv
-    jmp ToNumLoop
-ToNumLoopEnd:
-    mov r10, qword ptr [rbp+08h] ; reset argc
-    mov r11, qword ptr [rbp+10h] ; reset argv
+    mov r9, qword ptr [rcx + 18h]
+    mov r8, qword ptr [rcx + 10h]
+    mov rdx, qword ptr [rcx + 8h]
+    mov rcx, qword ptr [rcx]
 
-    cmp r10, 0 ; push first arg
-    jz ArgPushEnd
-    mov rcx, qword ptr [r11]
-    add r11, 08h
-    dec r10
+    call qword ptr [rbp-8h]
 
-    cmp r10, 0 ; push second arg
-    jz ArgPushEnd
-    mov rdx, qword ptr [r11]
-    add r11, 08h
-    dec r10
-
-    cmp r10, 0 ; push third arg
-    jz ArgPushEnd
-    mov r8, qword ptr [r11]
-    add r11, 08h
-    dec r10
-
-    cmp r10, 0 ; push fourth arg
-    jz ArgPushEnd
-    mov r9, qword ptr [r11]
-    add r11, 08h
-    dec r10
-
-    lea rax, [r10-1] ; move argc to rax
-    shl rax, 3 ; multiply by 8 (pointer size)
-    add r11, rax ; add argc * 8 to argv
-PushExtraArgsLoop:
-    cmp r10, 0 ; push extra args
-    jz ArgPushEnd
-    push qword ptr [r11]
-    sub r11, 08h ; decrement argv
-    dec r10 ; decrement argc
-    jmp PushExtraArgsLoop
-ArgPushEnd:
-    sub rsp, 20h
-
-    call qword ptr [rbp] ; call function
-
-; --------------- FUNCTION ENDING
-    add rbp, 30h
-    mov rsp, rbp ; reset rsp
-    ;pop r11 ; reset r11
-    ;pop r10 ; reset r10
-    ;pop r9 ; reset r11
-    pop rbp ; reset rbp
+    mov rsp, rbp
+    pop rbp ; retain rbp
     ret
-; --------------- FUNCTION ENDING
-callF ENDP
+
+_applyFStackArgs ENDP
+
+.DATA
+
+arg_jumps:
+dq OFFSET args_0
+dq OFFSET args_1
+dq OFFSET args_2
+dq OFFSET args_3
+dq OFFSET args_4
 
 END

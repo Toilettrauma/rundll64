@@ -1,131 +1,154 @@
-﻿// python-change-color.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
-
 #include <iostream>
+#include <vector>
+
+#ifdef _WIN32
 #define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <Psapi.h>
+#else
+// should work but not tested
+#include <dlfcn.h>
+#define LoadLibraryA(name) dlopen(name, RTLD_LAZY)
+#define GetProcAddress(handle, name) dlsym(handle, name)
+#define CloseLibrary(handle) dlclose(handle)
 
-#include <exception>
+typedef HMODULE void*;
+typedef void(*FARPROC)();
+#endif
 
-#include <vector>
-using namespace std;
+#include "options_call.h"
+#include "exceptions.h"
 
-//enum CallingConvention {
-//    //CDECL, unsupported
-//    //CLRCALL, unsupported
-//    STDCALL,
-//    FASTCALL,
-//    //THISCALL, unsupported
-//    //VECTORCALL unsupported
-//};
-
-struct LibNotFoundException : std::exception {
-    LibNotFoundException(const char* const libName) : std::exception(libName) {}
-};
-struct MethodNotFoundException : std::exception {
-    MethodNotFoundException(const char* const methodName) : std::exception(methodName) {}
-};
-
-struct AccessViolationException : std::exception {
-    AccessViolationException() : std::exception("Access violation") {}
-};
-
-void handler(unsigned int u, PEXCEPTION_POINTERS pExceptionInfo) {
+#pragma unmanaged
+void SEHandler(unsigned int u, PEXCEPTION_POINTERS pExceptionInfo) {
     if (u == EXCEPTION_ACCESS_VIOLATION) {
-        throw AccessViolationException();
+        throw AccessViolationException(pExceptionInfo->ExceptionRecord->ExceptionAddress, pExceptionInfo->ExceptionRecord->ExceptionInformation[1]);
     }
     else {
-        throw std::exception("SEH exception");
+        throw SEException(u);
     }
 }
+#pragma managed
 
-extern "C" void* __fastcall callF(void* functionP, long long argc, char* argv[]);
+long long* createApplyFArgs(const char** argv, const long long argc) {
+    long long* out = new long long [argc];
+    char* err;
+    long long argLL;
+    for (long long i = 0; i < argc; ++i) {
+        argLL = strtoll(argv[i], &err, 0);
+        if (err[0] == 0) {
+            out[i] = argLL;
+            continue;
+        }
+        out[i] = reinterpret_cast<long long>(argv[i]);
+    }
+    return out;
+}
 
-vector<void*>* invokeLibMethods(int argc, char* argv[]) {
-    HMODULE lib = nullptr;
-    FARPROC method = nullptr;
-    char** methodArgsStart = nullptr;
-    int argCount = 0;
-    vector<void*> *outs = new vector<void*>;
+#pragma unmanaged
+void* applyF_handler(void* function, const char** argv, long long argc) {
+    void* out = nullptr;
+    __try {
+        long long* procArgs = createApplyFArgs(argv, argc);
+        out = applyF(function, procArgs, argc);
+        delete[] procArgs;
+    }
+    __except (STATUS_HEAP_CORRUPTION) {
+        printf("Error\n");
+    }
+    return out;
+}
+#pragma managed
 
-    for (int i = 0; i < argc; i++) {
-        char* arg = argv[i];
-        switch (*arg) {
+std::vector<uintptr_t> invokeLibMethods(int argc, char** argv) {
+    std::vector<uintptr_t> outs;
+    std::vector<char*> formattedOuts;
+    char* arg, *formattedArg, *formatErr;
+    const char** procArgv = nullptr;
+    long long *procArgs, procArgc = 0, formatIndex, formattedTmp;
+    HMODULE module = nullptr;
+    char* moduleName = nullptr;
+    FARPROC proc = nullptr;
+    
+    for (int i = 0; i < argc; ++i) {
+        arg = argv[i];
+        switch (arg[0]) {
         case '@':
-            if (lib != nullptr) {
-                method = nullptr;
-                FreeLibrary(lib);
+        {
+            if (module != nullptr) {
+                FreeLibrary(module);
             }
-            lib = LoadLibraryA(arg + 1);
-            if (lib == nullptr) {
-                throw LibNotFoundException(arg + 1);
+            module = LoadLibraryA(arg + 1);
+            moduleName = arg + 1;
+            if (module == nullptr) {
+                throw LibNotFoundException(moduleName);
             }
             break;
+        }
         case '#':
-            if (lib != nullptr) {
-                if (method != nullptr) {
-                    outs->push_back(callF(method, argCount, methodArgsStart));
+        {
+            if (module != nullptr) {
+                if (proc != nullptr) {
+                    outs.push_back(reinterpret_cast<uintptr_t>(applyF_handler(proc, procArgv, procArgc)));
                 }
-                argCount = 0;
-                method = GetProcAddress(lib, arg + 1);
-                if (method == nullptr) {
-                    throw MethodNotFoundException(arg + 1);
+                proc = GetProcAddress(module, arg + 1);
+                if (proc == nullptr) {
+                    throw MethodNotFoundException(moduleName, arg + 1);
                 }
-                if (i + 1 < argc) {
-                    methodArgsStart = argv + i + 1;
-                }
+                procArgv = const_cast<const char**>(argv + i + 1);
+                procArgc = 0;
             }
             break;
+        }
         case '%':
         {
-            char* formattedArg = new char[16];
-            long long outToFormat = (long long)outs->at(strtol(arg + 1, nullptr, 10));
-            snprintf(formattedArg, 16, "%lld", outToFormat);
+            formattedOuts.resize(outs.size());
+            formatIndex = strtoll(arg + 1, &formatErr, 10);
+            if (formatErr[0] != 0) {
+                throw FormatErrorException(i);
+            }
+            if (formatIndex >= outs.size()) {
+                throw FormatErrorException(i);
+            }
+            if (formattedOuts.at(formatIndex) != nullptr) {
+                argv[i] = formattedOuts.at(formatIndex);
+            }
+            formattedTmp = outs.at(formatIndex); // todo add check
+            asprintf(formattedArg, "%lld", formattedTmp);
+            formattedOuts.push_back(formattedArg);
             argv[i] = formattedArg;
+            ++procArgc;
+            break;
         }
         default:
-            argCount++;
+            ++procArgc;
             break;
         }
     }
-    if (method != nullptr) {
-        outs->push_back(callF(method, argCount, methodArgsStart));
+    if (proc != nullptr) {
+        applyF_handler(proc, procArgv, procArgc);
     }
-    if (lib != nullptr) {
-        FreeLibrary(lib);
+    if (module != nullptr) {
+        FreeLibrary(module);
     }
+
+    for (char* arg : formattedOuts) {
+        delete[] arg;
+    }
+
     return outs;
 }
 
-int main(int argc, char* argv[])
-{
-    _set_se_translator(handler);
+int main(int argc, char** argv) {
+	_set_se_translator(SEHandler);
 
-    try {
-        vector<void*>* outs = invokeLibMethods(argc, argv);
+	try {
+		std::vector<uintptr_t> outs = invokeLibMethods(argc, argv);
     }
-    catch (LibNotFoundException e) {
-        printf("Lib not found: %s", e.what());
+    catch (FormatException& exception) {
+        printf("%s\n", exception.what());
+        return -1;
     }
-    catch (MethodNotFoundException e) {
-        printf("Method not found: %s", e.what());
-    }
-    catch (std::exception e) {
-        printf("Unknown exception: %s", e.what());
-    }
-
     return 0;
-
 }
-
-// Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
-// Отладка программы: F5 или меню "Отладка" > "Запустить отладку"
-
-// Советы по началу работы 
-//   1. В окне обозревателя решений можно добавлять файлы и управлять ими.
-//   2. В окне Team Explorer можно подключиться к системе управления версиями.
-//   3. В окне "Выходные данные" можно просматривать выходные данные сборки и другие сообщения.
-//   4. В окне "Список ошибок" можно просматривать ошибки.
-//   5. Последовательно выберите пункты меню "Проект" > "Добавить новый элемент", чтобы создать файлы кода, или "Проект" > "Добавить существующий элемент", чтобы добавить в проект существующие файлы кода.
-//   6. Чтобы снова открыть этот проект позже, выберите пункты меню "Файл" > "Открыть" > "Проект" и выберите SLN-файл.
