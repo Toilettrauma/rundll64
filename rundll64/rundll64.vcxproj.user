@@ -9,7 +9,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>@kernel32.dll #GetStdHandle -11 #WriteConsoleA %0 huy 3 0 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>@kernel32.dll #GetProcessHeap #HeapAlloc %0 8 255 #GetCurrentDirectoryA 255 %1 #GetStdHandle -11 #WriteConsoleA %3 %1 %2 0 0</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
