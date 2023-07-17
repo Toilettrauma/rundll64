@@ -45,7 +45,7 @@ _applyFStackArgs PROC
     mov rbp, rsp
 
     sub r8, 4h          ; argc -= 4
-    mov rcx, r8         ; repeat count = argc - 4
+    mov rcx, r8         ; repeat count = argc
     shl r8, 3           ; argc *= 8
     lea rsi, [rdx+20h]  ; src: argv + (4*8)
     sub rsp, r8         ; rsp -= argc
