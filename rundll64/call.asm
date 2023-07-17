@@ -6,9 +6,9 @@ EXTERN __imp_memcpy :PROC
 
 applyF PROC
 ; rcx function, rdx argv, r8 argc
+    mov rax, rcx
     cmp r8, 4
     ja _applyFStackArgs
-    mov rax, rcx
     mov rcx, rdx ; maybe remove
     mov r8, qword ptr [r8 * 8 + OFFSET arg_jumps]
     jmp r8
@@ -40,28 +40,26 @@ args_4::
 applyF ENDP
 
 _applyFStackArgs PROC
-; rax function, rdx argv_last, r8 argc
+; rax function, rdx argv, r8 argc
     push rbp ; save rbp
     mov rbp, rsp
-    sub rsp, 18h ; shadow space (3 variable)
-    
-    mov [rbp-8h], rcx    ; 1st var = function
-    mov [rbp-10h], rdx ; 2nd var = argv
-    lea r8, [r8*8-20h]    ; size: (argc - 4) * 8
-    add rdx, 20h          ; src: (longlong)argv + 4
-    lea rcx, [rsp-8h]    
-    sub rcx, r8           ; dest: rsp - size - 8(reserve ret addr)
-    call qword ptr [__imp_memcpy]
 
-    lea rsp, [rax-20h] ; rsp = dest - (4*8)
-    mov rcx, [rbp-10h]  ; retain argv (2nd var)
+    sub r8, 4h
+    mov rcx, r8
+    shl r8, 3
+    lea rsi, [rdx+20h]
+    sub rsp, r8
+    mov rdi, rsp
+    rep movsq
 
-    mov r9, qword ptr [rcx + 18h]
-    mov r8, qword ptr [rcx + 10h]
-    mov rdx, qword ptr [rcx + 8h]
-    mov rcx, qword ptr [rcx]
+    sub rsp, 20h
 
-    call qword ptr [rbp-8h]
+    mov r9, qword ptr [rdx + 18h]
+    mov r8, qword ptr [rdx + 10h]
+    mov rcx, qword ptr [rdx]
+    mov rdx, qword ptr [rdx + 8h]
+
+    call rax
 
     mov rsp, rbp
     pop rbp ; retain rbp
