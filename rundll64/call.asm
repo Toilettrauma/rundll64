@@ -44,15 +44,15 @@ _applyFStackArgs PROC
     push rbp ; save rbp
     mov rbp, rsp
 
-    sub r8, 4h
-    mov rcx, r8
-    shl r8, 3
-    lea rsi, [rdx+20h]
-    sub rsp, r8
-    mov rdi, rsp
+    sub r8, 4h          ; argc -= 4
+    mov rcx, r8         ; repeat count = argc - 4
+    shl r8, 3           ; argc *= 8
+    lea rsi, [rdx+20h]  ; src: argv + (4*8)
+    sub rsp, r8         ; rsp -= argc
+    mov rdi, rsp        ; dest: rsp
     rep movsq
 
-    sub rsp, 20h
+    sub rsp, 20h        ; reserve 4 arguments (4*8)
 
     mov r9, qword ptr [rdx + 18h]
     mov r8, qword ptr [rdx + 10h]
